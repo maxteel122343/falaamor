@@ -1,0 +1,8 @@
+{
+  "name": "Copy of Copy of 14 51 Love AI",
+  "description": "A retro-styled relationship simulator powered by Gemini Multimodal Live API. Upload a partner photo, define their personality, and chat in real-time.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
