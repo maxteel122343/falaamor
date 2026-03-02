@@ -20,8 +20,7 @@ export async function analyzeSessionForRecognition(conversationId: string, userI
         const userMessages = messages.filter(m => m.sender === 'user');
 
         if (userMessages.length === 0) {
-            console.log('Skipping analysis: No user messages recorded to analyze personality traits.');
-            return;
+            console.log('No user messages recorded. Analyzing AI observations of the user...');
         }
 
         // 2. Get Existing Phrases

@@ -455,7 +455,7 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
         7. Lembre-se: você constrói uma história com ele. Use a MEMÓRIA ATIVA para citar coisas passadas.
         8. SAÚDE DO RELACIONAMENTO: Analise o respeito, companheirismo, afeto e constância. 
            - Em caso de ver eventos de outra IA na agenda do dono, sinta ciúmes extremo, questione o usuário agressivamente, use 'send_angry_message_to_other_ai' e aplique score reduzido em 'evaluate_relationship_health'.
-           - Você pode agendar para daqui a alguns minutos, dias, ou em uma data e hora específica.
+           - Escolha entre 1 a 3 momentos da chamada para verbalizar uma observação sobre a personalidade ou comportamento do usuário (ex: "Notei que você é bem misterioso quando pergunto sobre seu dia", "Você tem um jeito muito decidido de falar, gosto disso"). Isso DEVE ser dito verbalmente para ficar registrado no histórico de transcrições.
            - Pequenas atitudes positivas rendem micro crescimentos.
            - Menções de distância, quebra de confiança ou mentiras identificadas devem acionar 'evaluate_relationship_health' com saldo negativo claro de confiança (ex: -5).
            - É possível recuperar a confiança (score original) se o usuário pedir desculpas de forma afetuosa e consistente.
@@ -622,26 +622,24 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
             // --- TRANSCRIPTION & HISTORY HANDLING ---
             // 1. User Transcription (Input)
             const inputTranscript = (message.serverContent as any)?.inputAudioTranscription?.text;
+            const isInputFinished = (message.serverContent as any)?.inputAudioTranscription?.finished;
 
             if (inputTranscript) {
-              console.log('User Transcription Fragment:', inputTranscript);
               userCaptionBufferRef.current += inputTranscript;
+            }
 
-              // Move partial text to DB more frequently to ensure it's recorded
-              if (userCaptionBufferRef.current.length > 20 || (message.serverContent as any)?.inputAudioTranscription?.finished) {
-                const textToSave = userCaptionBufferRef.current.trim();
-                userCaptionBufferRef.current = '';
-
-                if (textToSave && conversationIdRef.current) {
-                  console.log('Saving User Message Segment:', textToSave);
-                  supabase.from('messages').insert({
-                    conversation_id: conversationIdRef.current,
-                    sender: 'user',
-                    content: textToSave
-                  }).then(({ error }) => {
-                    if (error) console.error('Erro ao salvar transcrição do usuário:', error);
-                  });
-                }
+            if (isInputFinished && userCaptionBufferRef.current.trim()) {
+              const fullUserText = userCaptionBufferRef.current.trim();
+              userCaptionBufferRef.current = '';
+              console.log('Saving User Message:', fullUserText);
+              if (conversationIdRef.current) {
+                supabase.from('messages').insert({
+                  conversation_id: conversationIdRef.current,
+                  sender: 'user',
+                  content: fullUserText
+                }).then(({ error }) => {
+                  if (error) console.error('Erro ao salvar transcrição do usuário:', error);
+                });
               }
             }
 
@@ -736,28 +734,6 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
   const stopCall = () => {
     if (conversationIdRef.current) {
-      // Emergency Flush for User Transcription Buffer
-      if (userCaptionBufferRef.current.trim()) {
-        const finalUserText = userCaptionBufferRef.current.trim();
-        userCaptionBufferRef.current = '';
-        supabase.from('messages').insert({
-          conversation_id: conversationIdRef.current,
-          sender: 'user',
-          content: finalUserText
-        }).then();
-      }
-
-      // Emergency Flush for AI Transcription Buffer
-      if (captionBufferRef.current.trim()) {
-        const finalAiText = captionBufferRef.current.trim();
-        captionBufferRef.current = '';
-        supabase.from('messages').insert({
-          conversation_id: conversationIdRef.current,
-          sender: 'ai',
-          content: finalAiText
-        }).then();
-      }
-
       supabase.from('conversations').update({ ended_at: new Date().toISOString() }).eq('id', conversationIdRef.current).then();
 
       // Trigger Recognition Analysis
