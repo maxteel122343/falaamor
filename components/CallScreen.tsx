@@ -473,8 +473,8 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
             voiceConfig: { prebuiltVoiceConfig: { voiceName: profile.voice } }
           },
           systemInstruction: systemInstruction,
-          outputAudioTranscription: {},
-          inputAudioTranscription: {},
+          outputAudioTranscription: { enabled: true },
+          inputAudioTranscription: { enabled: true },
           tools: [{ functionDeclarations: [gestureTool, scheduleTool, topicTool, personalityTool, psychologicalTool, reportTool, relationshipHealthTool, confrontAiTool, breakLoyaltyTool] }],
         }
       };
@@ -509,6 +509,11 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
             startVideoStreaming(sessionPromise);
           },
           onmessage: async (message: LiveServerMessage) => {
+            // DEBUG LOG
+            if ((message.serverContent as any)?.inputAudioTranscription) {
+              console.log('User Transcription Detected:', (message.serverContent as any).inputAudioTranscription);
+            }
+
             if (message.toolCall) {
               const responses = await Promise.all(message.toolCall.functionCalls.map(async fc => {
                 let result = "ok";
@@ -616,8 +621,8 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
             // --- TRANSCRIPTION & HISTORY HANDLING ---
             // 1. User Transcription (Input)
-            const inputTranscript = (message as any).serverContent?.inputAudioTranscription?.text;
-            const isInputFinished = (message as any).serverContent?.inputAudioTranscription?.finished;
+            const inputTranscript = (message.serverContent as any)?.inputAudioTranscription?.text;
+            const isInputFinished = (message.serverContent as any)?.inputAudioTranscription?.finished;
 
             if (inputTranscript) {
               userCaptionBufferRef.current += inputTranscript;
@@ -626,6 +631,7 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
             if (isInputFinished && userCaptionBufferRef.current.trim()) {
               const fullUserText = userCaptionBufferRef.current.trim();
               userCaptionBufferRef.current = '';
+              console.log('Saving User Message:', fullUserText);
               if (conversationIdRef.current) {
                 supabase.from('messages').insert({
                   conversation_id: conversationIdRef.current,

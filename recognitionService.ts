@@ -17,6 +17,12 @@ export async function analyzeSessionForRecognition(conversationId: string, userI
         }
 
         const conversationText = messages.map(m => `${m.sender.toUpperCase()}: ${m.content}`).join('\n');
+        const userMessages = messages.filter(m => m.sender === 'user');
+
+        if (userMessages.length === 0) {
+            console.log('Skipping analysis: No user messages recorded to analyze personality traits.');
+            return;
+        }
 
         // 2. Get Existing Phrases
         const { data: existingPhrases } = await supabase
