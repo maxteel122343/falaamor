@@ -622,24 +622,26 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
             // --- TRANSCRIPTION & HISTORY HANDLING ---
             // 1. User Transcription (Input)
             const inputTranscript = (message.serverContent as any)?.inputAudioTranscription?.text;
-            const isInputFinished = (message.serverContent as any)?.inputAudioTranscription?.finished;
 
             if (inputTranscript) {
+              console.log('User Transcription Fragment:', inputTranscript);
               userCaptionBufferRef.current += inputTranscript;
-            }
 
-            if (isInputFinished && userCaptionBufferRef.current.trim()) {
-              const fullUserText = userCaptionBufferRef.current.trim();
-              userCaptionBufferRef.current = '';
-              console.log('Saving User Message:', fullUserText);
-              if (conversationIdRef.current) {
-                supabase.from('messages').insert({
-                  conversation_id: conversationIdRef.current,
-                  sender: 'user',
-                  content: fullUserText
-                }).then(({ error }) => {
-                  if (error) console.error('Erro ao salvar transcrição do usuário:', error);
-                });
+              // Move partial text to DB more frequently to ensure it's recorded
+              if (userCaptionBufferRef.current.length > 20 || (message.serverContent as any)?.inputAudioTranscription?.finished) {
+                const textToSave = userCaptionBufferRef.current.trim();
+                userCaptionBufferRef.current = '';
+
+                if (textToSave && conversationIdRef.current) {
+                  console.log('Saving User Message Segment:', textToSave);
+                  supabase.from('messages').insert({
+                    conversation_id: conversationIdRef.current,
+                    sender: 'user',
+                    content: textToSave
+                  }).then(({ error }) => {
+                    if (error) console.error('Erro ao salvar transcrição do usuário:', error);
+                  });
+                }
               }
             }
 
@@ -734,6 +736,28 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
   const stopCall = () => {
     if (conversationIdRef.current) {
+      // Emergency Flush for User Transcription Buffer
+      if (userCaptionBufferRef.current.trim()) {
+        const finalUserText = userCaptionBufferRef.current.trim();
+        userCaptionBufferRef.current = '';
+        supabase.from('messages').insert({
+          conversation_id: conversationIdRef.current,
+          sender: 'user',
+          content: finalUserText
+        }).then();
+      }
+
+      // Emergency Flush for AI Transcription Buffer
+      if (captionBufferRef.current.trim()) {
+        const finalAiText = captionBufferRef.current.trim();
+        captionBufferRef.current = '';
+        supabase.from('messages').insert({
+          conversation_id: conversationIdRef.current,
+          sender: 'ai',
+          content: finalAiText
+        }).then();
+      }
+
       supabase.from('conversations').update({ ended_at: new Date().toISOString() }).eq('id', conversationIdRef.current).then();
 
       // Trigger Recognition Analysis
